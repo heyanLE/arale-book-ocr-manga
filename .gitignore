@@ -1,0 +1,7 @@
+# 构建产物：1.6 GB 级中间产物与 0.75 GB 级归档。**不进 git**：
+# 归档走 GitHub Release（Release 资源不计 LFS 配额，也不需要 git clone 拉下来）。
+build/
+dist/*.zip
+# 清单条目是构建产物（含 sha256/bytes），跑一次构建就会重新生成；但它很小、
+# 且发布时要粘进应用的 catalog.json，所以留一份最新的在仓库里也可接受（见 README）。
+!dist/catalog-entry-*.json

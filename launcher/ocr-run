@@ -1,0 +1,11 @@
+#!/bin/sh
+# ocr-run —— macOS 下手动/命令行启动 manga-anki OCR 桥的模板。
+#
+# 注意：**应用的正式 runner 不走这个脚本**（见 README「为什么 macOS 的 runner 是
+# python/bin/python3 而不是 bin/ocr-run」）。归档解压后文件权限位会丢，应用只会给
+# `extension.json → runner.program` 那一个路径补 +x；本脚本若要能跑，还依赖
+# `python/bin/python3` 也有执行位。所以真正安装到应用里时 runner 直接指向解释器，
+# 这个脚本留给人工排障：在构建目录（权限位是本机真实权限）里直接执行即可。
+set -e
+HERE=$(cd "$(dirname "$0")/.." && pwd)
+PYTHONPATH="$HERE/engine" exec "$HERE/python/bin/python3" -s -u "$HERE/ocr-bridge.py" --manga-anki-root "$HERE" "$@"

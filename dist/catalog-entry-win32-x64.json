@@ -1,0 +1,24 @@
+{
+  "id": "ocr-manga-anki",
+  "name": "manga-anki OCR（mokuro 管线）",
+  "summary": "自带 Python 运行时与模型的漫画/小说 OCR 引擎（comic-text-detector + manga-ocr）",
+  "version": "1.0.0",
+  "kind": "ocr-engine",
+  "provides": "manga-anki",
+  "platforms": [
+    "win32"
+  ],
+  "arch": [
+    "x64"
+  ],
+  "urls": [
+    "https://github.com/aralebook/extensions/releases/latest/download/ocr-manga-anki-windows-x64.zip"
+  ],
+  "bytes": 780910747,
+  "sha256": "b8a512adbd6e3f93b16d70f83171dde9b066fc3dcfae65544520d588ae7f9065",
+  "installedBytes": 1586479241,
+  "license": "GPL-3.0",
+  "homepage": "https://github.com/kha-white/mokuro",
+  "requires": [],
+  "notes": "离线可用，不需要用户装 Python。解包后约 1513 MiB，首次识别会加载约 500 MiB 模型"
+}
