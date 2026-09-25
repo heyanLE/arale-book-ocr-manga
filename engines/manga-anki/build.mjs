@@ -11,7 +11,7 @@
  * 归档根目录的布局（应用把它解到 `<userData>/extensions/ocr-manga-anki/` 后直接跑）：
  *
  *     extension.json                 # 自描述 + runner
- *     ocr-bridge.py                  # 构建时从 scripts/ocr-bridge.py 拷贝（单一真相源）
+ *     ocr-bridge.py                  # 构建时从本引擎目录拷贝（唯一真相源）
  *     bin/ocr-run                    # 仅 macOS；人工排障用，不是正式 runner
  *     python/                        # 自带解释器（不是 venv！）
  *     engine/                        # 第三方包（site-packages 的内容）
@@ -89,7 +89,9 @@ import zlib from 'node:zlib';
 // ---------------------------------------------------------------------------
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-const REPO = HERE; // 这个仓库自己就是根：桥、启动器模板、LICENSE 都在这里
+const REPO = HERE; // 引擎自己的目录：桥、启动器模板都在这儿（dist/ 也落这儿）
+/** 仓库根：共享工具（跨引擎复用的）放在 `<root>/tools/`。 */
+const LIB_ROOT = path.resolve(HERE, '..', '..');
 
 /**
  * 构建前置：一份 **manga_anki 检出**（它提供 `.ocr-venv` 与 `.models`）。
@@ -597,7 +599,7 @@ function buildPureWheel(sitePackages, spec, outDir) {
  * `--strict` 时这些「装了才有」的依赖也算失败（要发一个「零前提」的包就开它）。
  */
 function auditWindowsDeps(staging, strict) {
-  const tool = path.join(HERE, 'tools', 'audit-win-deps.mjs');
+  const tool = path.join(LIB_ROOT, 'tools', 'audit-win-deps.mjs');
   if (!fs.existsSync(tool)) {
     log('audit', `跳过依赖体检：找不到 ${tool}`);
     return;
