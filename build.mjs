@@ -584,6 +584,38 @@ function buildPureWheel(sitePackages, spec, outDir) {
 // ---------------------------------------------------------------------------
 
 
+/**
+ * Windows 归档的依赖体检：把包里所有 PE 文件的导入表扫一遍，指出「既不在包里、也不在
+ * 已知系统 DLL 里」的依赖。
+ *
+ * 这台构建机是 macOS，**跑不了 Windows**，所以「能装」只能靠这种静态手段把关。
+ * 实测它抓到了真问题：`torch_cpu.dll` 要 `vcruntime140_threads.dll`、
+ * `torch_python.dll` 要 `msvcp140_atomic_wait.dll`，而 embedding CPython 只带
+ * `vcruntime140.dll` / `vcruntime140_1.dll`——没装新版 VC++ 运行库的机器上 torch 直接加载失败。
+ * 另外 `cv2.pyd` 要 Media Foundation，Windows **N/KN 版**默认没有。
+ *
+ * `--strict` 时这些「装了才有」的依赖也算失败（要发一个「零前提」的包就开它）。
+ */
+function auditWindowsDeps(staging, strict) {
+  const tool = path.join(HERE, 'tools', 'audit-win-deps.mjs');
+  if (!fs.existsSync(tool)) {
+    log('audit', `跳过依赖体检：找不到 ${tool}`);
+    return;
+  }
+  const args = [tool, staging];
+  if (strict) args.push('--strict');
+  const result = spawnSync(process.execPath, args, { encoding: 'utf8' });
+  const output = `${result.stdout ?? ''}${result.stderr ?? ''}`.trim();
+  for (const line of output.split('\n')) if (line.trim() !== '') log('audit', line.replace(/^\[audit\]\s*/, ''));
+  if (result.status !== 0) {
+    fail(
+      'audit',
+      'Windows 依赖体检没通过：包里有既不在包内、也不是系统 DLL 的依赖。' +
+        '要么把缺的 DLL 补进归档（见 tools/audit-win-deps.mjs 顶部注释），要么明确接受这个前提。',
+    );
+  }
+}
+
 function prune(root, match) {
   const before = measure(root);
   const walk = (abs, rel) => {
@@ -1166,6 +1198,12 @@ function parseArgs(argv) {
     };
     if (arg === '--target') options.target = next();
     else if (arg === '--manga-anki-root') options.root = next();
+    else if (arg === '--audit') {
+      // 只体检不构建：对已有中间产物跑一遍（改完依赖想立刻看结论时用）。
+      auditWindowsDeps(next(), false);
+      process.exit(0);
+    }
+    else if (arg === '--strict-audit') options.strictAudit = true;
     else if (arg === '--version') options.version = next();
     else if (arg === '--python-archive') options.pythonArchive = path.resolve(next());
     else if (arg === '--skip-zip') options.skipZip = true;
@@ -1183,6 +1221,8 @@ function usage() {
       '用法：node build.mjs --target <darwin-arm64|win32-x64|all> [选项]',
       '',
       '  --manga-anki-root <path>   manga_anki 检出根（必填，也可用 $ARALE_MANGA_ANKI_ROOT）',
+      '  --audit <dir>              只对已有 Windows 中间产物跑依赖体检，不构建',
+      '  --strict-audit             「装了才有」的系统依赖也算失败（发零前提的包时开）',
       '  --version <v>              写进 extension.json 的版本（默认 1.0.0）',
       '  --skip-zip                 只构建 build/<target>/，不打包 dist/',
       '  --python-archive <zip>     Windows embeddable CPython 的本地 zip（默认自动下载）',
@@ -1211,6 +1251,8 @@ async function buildOne(target, options) {
     target === 'darwin-arm64'
       ? await buildDarwin(factory, options)
       : await buildWindows(factory, options);
+
+  if (target === 'win32-x64') auditWindowsDeps(result.staging, options.strictAudit);
 
   if (options.skipZip) {
     log('build', `--skip-zip：跳过打包（中间产物留在 ${result.staging}）`);

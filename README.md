@@ -147,6 +147,13 @@ engine/                        # 第三方包（裁剪后的 site-packages）
   （150 个 `.pyd` / 22 个 dll / `python312._pth` / 各平台 `extension.json`）。
   第一次上 Windows 建议先跑
   `python\python.exe ocr-bridge.py --manga-anki-root . --pages-file pages.json`，看有没有缺 DLL。
+- 为此加了一个**依赖体检**：`node tools/audit-win-deps.mjs build/win32-x64`
+  （已接进 `build.mjs` 的 win32 收尾，`--audit <dir>` 可单独跑，`--strict-audit` 更严）。
+  它扫包里 204 个 PE 文件的导入表，结论是**没有硬缺失**，但有 6 种「装了才有」的系统依赖，
+  其中两条是真风险：`torch_cpu.dll` 要 `vcruntime140_threads.dll`、`torch_python.dll` 要
+  `msvcp140_atomic_wait.dll`（**包里没有** → 没装 VC++ 2015–2022 运行库的机器上 torch 加载失败）；
+  `cv2.pyd` 要 Media Foundation（**Windows N/KN 版**默认没有）。补法见主应用仓库
+  `docs/rust-engine-feasibility.md` §7。
 - 没有在 macOS 14 以下或 Intel Mac 上试过。
 - 没有做代码签名/公证；走 Apple 公证时需要单独处理归档里的解释器与 `.so`/`.dylib`
   （hardened runtime 下通常要给应用加 `com.apple.security.cs.disable-library-validation`）。
