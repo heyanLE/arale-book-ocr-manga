@@ -96,12 +96,31 @@ libjpeg-turbo 兼容的解码器（C 依赖），见 `../docs/roadmap.md` 第 2 
 
 **整本跑通（不是抽样）：**171 页、**0 失败**、691.5 s（约 4.0 s/页），NDJSON 全部可解析。
 
+## 和 Python 版比
+
+同一台机器、**同一批 30 页**、同样两个模型（Python 用
+`engines/legacy/python-manga-anki/ocr-bridge.py`，torch CPU + `torch.set_num_threads(4)`）：
+
+| | 30 页耗时 | 每页 | 行数 | 文字逐字一致（以 Python 为基准） |
+|---|---|---|---|---|
+| Python 参考（torch CPU） | 83.3 s（含解释器与模型加载 ≈8–10 s） | ~2.8 s | 385 | — |
+| Rust 旧早停版（4.x `BeamSearchScorer` 语义） | 111.9 s | 3.7 s | 383 | 314/375 = **83.7%** |
+| Rust 现在（5.x `_beam_search()` 语义） | 119.9 s | 4.0 s | 383 | 323/375 = **86.1%** |
+
+- **准**：换到 5.x 语义后 +2.4 个百分点，而且修掉的是**肉眼可见的错**
+  （倾斜难行 `いやっ！！` → 4.x 语义给 `いいのよ`）；
+- **快**：旧早停版只快 7%（不是"好几倍"——多数漫画行很短，早停省下的步数有限）；
+- **慢在哪**：慢 Python 约 1.4×，根因是 ONNX 解码器**没有 KV cache**——
+  每一步都把整个前缀重算一遍（HF `generate` 有 cache），且每步固定 batch=4。
+  注意 CPU 时间反而是 Python 的 5 倍（9–10 min vs 1m52s）：`ort` 默认吃满所有核，
+  torch 那边被限成 4 线程。想追平就得导出带 `past_key_values` 的解码器。
+
 **还没做：**
 
 - Windows 归档（需要 Windows 的 `onnxruntime.dll` 与 x64 二进制，macOS 上交叉不了）；
 - 模型的 int8 量化：当前归档用的是 fp32 ONNX（未压缩 563 MiB），量化后约 170 MiB、gzip 约 132 MiB；
 - 传 release 并把清单里的 sha256/bytes 换成真值（`build.mjs` 已经会算）；
-- 性能：新的束搜索比旧的早停版慢约 3×，171 页实测约 4.4 s/页（中位 4.25 s）。
+- 性能：见下面「和 Python 版比」一节——比 Python 参考慢约 1.4×，慢在**没有 KV cache**。
 
 ## 打包
 
