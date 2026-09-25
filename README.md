@@ -23,8 +23,14 @@ LICENSE            GPL-3.0
 | 体积 | 安装包几十 MB | 归档 ~0.75 GB / 解包 1.5 GB |
 | 许可 | GPL-3.0 | GPL-3.0（comic-text-detector、mokuro 都是 GPL） |
 
-应用侧只认一份 `extension.json` 和一套 NDJSON 协议，所以**这里换实现、应用一行都不用动**
-（比如以后把两个模型导成 ONNX 用 Rust 直接跑，归档会从 750 MB 掉到几十 MB）。
+应用侧只认一份 `extension.json` 和一套 NDJSON 协议，所以**这里换实现、应用一行都不用动**。
+
+> 换成 Rust/ONNX 这件事已经实测过：两个模型都能导出 ONNX（编码器 343→87 MB、解码器 117→30 MB、
+> 检测器 95→54 MB，int8 合计 **170 MB**，数值差异 ~1e-5），识别结果与 PyTorch 在真实裁剪上逐字一致
+> （**解码必须照抄 `num_beams=4 / no_repeat_ngram_size=3 / length_penalty=2.0`**，裸贪心在难图上会给出不同文字）；
+> 分词器实测等价于「NFKC + 逐字查表」，**不需要 MeCab 与 248 MiB 的 UniDic**（真实语料 2241 条零差异）。
+> 剩下的风险集中在检测器那 ~500 行 OpenCV 后处理。完整数据与验收标准见主应用仓库的
+> `docs/rust-engine-feasibility.md`。
 
 ## 源码很小，**不需要 LFS**
 
