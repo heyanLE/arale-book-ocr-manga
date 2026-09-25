@@ -13,10 +13,11 @@
 
 | 引擎 | 目录 | 语言/运行时 | 归档大小 | 平台 | 状态 |
 |---|---|---|---|---|---|
-| **manga-anki** | [`manga-anki/`](manga-anki/) | Python 3.12（自带解释器）+ comic-text-detector / manga-ocr | **741 MiB**（macOS）/ **745 MiB**（Windows） | macOS arm64、Windows x64 | macOS 已实机跑通整本 171 页；Windows 已打包并做过依赖体检，**未在 Windows 实机运行** |
+| **arale_onnx_v1** | [`arale_onnx_v1/`](arale_onnx_v1/) | **Rust** + ONNX Runtime（自带） | 目标 ≈170 MB（int8 模型 132 + ORT 33 + 二进制） | macOS arm64、Windows x64 | **重写中**：模型导出、分词、解码已验证；检测器后处理与打包待做 |
+| *(已弃用)* manga-anki | [`legacy/python-manga-anki/`](legacy/python-manga-anki/) | Python 3.12 + PyTorch | 741 MiB（macOS）/ 745 MiB（Win） | — | **不再发布**：保留留档。整套 Python 运行时（CPython + torch + UniDic）在新实现里被彻底去掉 |
 
-> 目前只有这一个。清单是**给未来留的位**：第二个引擎（比如 Rust/ONNX 版、或别的语言的实现）
-> 只要满足下面的约定，就能和它并存，应用侧一行代码都不用改。
+> 引擎改名/换实现的代价很低（应用只认协议），所以 `arale_onnx_v1` 与旧的 Python 版可以并存于
+> 仓库、由清单决定发布哪个。**当前只发布 `arale_onnx_v1`**；Python 版整体弃用、不参与构建与发布。
 
 ---
 
@@ -99,8 +100,7 @@
 
 ```bash
 git clone --recursive git@github.com:heyanLE/arale-book.git     # submodule 一起下来
-cd arale-book/engines/manga-anki
-node build.mjs --target all --manga-anki-root /path/to/manga_anki
-# → dist/ocr-manga-anki-macos-arm64.zip、dist/ocr-manga-anki-windows-x64.zip
-# → dist/catalog-entry-*.json（粘进应用的 resources/extensions/catalog.json）
+cd arale-book/engines/arale_onnx_v1
+cargo build --release            # Rust 引擎（ONNX Runtime 用 load-dynamic，运行时指过去）
+node build.mjs --target all      # 装配归档 + 更新库根 catalog.json（release{repo,tag,asset}）
 ```
