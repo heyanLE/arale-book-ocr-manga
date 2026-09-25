@@ -93,6 +93,7 @@
 | `tools/audit-win-deps.mjs` | **Windows 依赖体检**：扫归档里所有 PE 文件的导入表，指出「既不在包里、也不是系统 DLL」的依赖。构建机往往是 macOS，跑不了 Windows，只能靠它把关。已接进 manga-anki 的 win32 构建收尾 |
 | `LICENSE` | GPL-3.0（comic-text-detector 与 mokuro 都是 GPL，所以这一整库也是） |
 | `docs/models.md` | **模型权重是哪儿来的**、现在怎么获取、几种可选形态（供决策） |
+| `docs/roadmap.md` | **已 mark 的后续项**：分词引擎也要单独分发（+ 设计约束）、Rust 引擎剩余工作、模型分发形态、协议版本字段 |
 
 ---
 
