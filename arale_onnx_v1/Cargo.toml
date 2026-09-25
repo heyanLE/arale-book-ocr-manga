@@ -1,0 +1,27 @@
+[package]
+name = "arale_onnx_v1"
+version = "0.1.0"
+edition = "2021"
+description = "arale_onnx_v1：comic-text-detector + manga-ocr 的 Rust/ONNX 实现（原 Python 版已弃用）"
+license = "GPL-3.0"
+
+[[bin]]
+name = "arale_onnx_v1"
+path = "src/main.rs"
+
+[dependencies]
+# load-dynamic：不在构建时下载 ONNX Runtime，运行时由归档里自带的 dylib/dll 提供
+# （`ORT_DYLIB_PATH`）。这样构建可离线、分发可控，也避免构建机与目标机版本不一致。
+ort = { version = "2.0.0-rc.13", default-features = false, features = ["load-dynamic", "ndarray"] }
+ndarray = "0.17"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp", "bmp", "tiff"] }
+unicode-normalization = "0.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+anyhow = "1"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
