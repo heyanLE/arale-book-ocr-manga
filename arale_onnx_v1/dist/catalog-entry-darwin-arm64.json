@@ -1,0 +1,24 @@
+{
+  "id": "ocr-arale_onnx_v1",
+  "name": "arale_onnx_v1（ONNX 版 OCR）",
+  "summary": "comic-text-detector 检测 + manga-ocr 识别，Rust 实现 + 自带 ONNX Runtime。竖排质量好，装完不需要任何外部依赖。",
+  "version": "0.1.0",
+  "kind": "ocr-engine",
+  "provides": "arale_onnx_v1",
+  "platforms": [
+    "darwin"
+  ],
+  "arch": [
+    "arm64"
+  ],
+  "urls": [
+    "https://github.com/heyanLE/arale-book-ocr-manga/releases/download/v0.1.0/arale_onnx_v1-macos-arm64.zip"
+  ],
+  "bytes": 496460661,
+  "sha256": "0d4c1a6bd85aa43ee64e59fdec49016e7c294a65a2eff4c33a8841e9cb6db29f",
+  "installedBytes": 590453652,
+  "license": "GPL-3.0",
+  "homepage": "https://github.com/heyanLE/arale-book-ocr-manga",
+  "requires": [],
+  "notes": "离线可用，不需要用户装 Python 或 ONNX Runtime。解包约 563 MiB"
+}

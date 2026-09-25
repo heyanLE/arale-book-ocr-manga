@@ -31,18 +31,47 @@
 
 ---
 
-## 2. `arale_onnx_v1` 本身还没写完
+## 2. `arale_onnx_v1` 的状态
 
-见 [`arale_onnx_v1/README.md`](../arale_onnx_v1/README.md) 的「状态」一节。剩下：
+见 [`arale_onnx_v1/README.md`](../arale_onnx_v1/README.md) 的「状态」一节。
 
-1. `main.rs`：NDJSON 协议 + `--pages-file`（与旧 Python 版同口径，应用侧一行都不用改）；
-2. 图像预处理（检测器 letterbox / 识别器 灰度→RGB→224→归一化）；
-3. **检测器后处理**（最大一块）：实测**不能只用 YOLO 头**（与现有 DB 分割产出的框 IoU 中位
-   只有 0.41/0.59），要移植 DB representer + 行分组；
-4. `build.mjs`：装配 `bin/` + `models/*.onnx` + ONNX Runtime + `extension.json`，
-   并更新库根 `catalog.json`；
-5. **验收**：171 页 golden 语料逐页比对（文字逐字一致率 ≥99%、框 IoU 中位 ≥0.90）；
-6. 传 release → 清单里的 sha256 从空变成真值（现在 sha 为空 = 未发布，安装会被明确拒绝）。
+**已完成（都有实测依据，见 `arale_onnx_v1/src/*.rs` 的文件头）：**
+
+1. `main.rs`：NDJSON 协议 + `--pages-file`（与旧 Python 版同口径，应用侧一行都不用改）+
+   `--probe` / `--crop` / `--tokenize` / `--dump-tensor` / `--dump-prob` / `--dump-image`；
+2. 图像预处理：检测器 letterbox（cv2 `INTER_LINEAR` 口径、右/下补边、BGR）+
+   识别器（PIL 灰度 → 224 BILINEAR → mean/std 0.5）。与 HF `ViTImageProcessor`
+   逐值差 ≤1 个灰阶（max|Δ| = 0.0078）；
+3. 分词：NFKC + 逐字查表（等价于 `BertJapaneseTokenizer`，2241/2241 真实语料零差异），
+   不需要 MeCab / UniDic；
+4. 解码：**照抄 transformers 5.x 的 `_beam_search()`**（不是 4.x 的 `BeamSearchScorer` 语义，
+   也不是贪心）；4 组真实裁切文字与 `sequences_scores` 全部与 MangaOcr 相同；
+5. 检测器后处理：DB 分割图 → 8 连通域 → 最小外接**旋转**矩形 → unclip(1.5) →
+   外接矩形四角 AABB + `pad = max(2, int(font_size*0.10))` + 分阈值 0.6；
+6. `build.mjs`：装配 `bin/` + `models/*.onnx` + ONNX Runtime + `extension.json`，
+   写 `dist/catalog-entry-<target>.json` 与库根 `catalog.json`。
+
+**还没做完：**
+
+1. **171 页 golden 语料的逐页验收**。当前只做了 5 页（001/022/050/100/150）的对照：
+   行数基本对齐（32/32、37/38、7/7、1/1、5/4），**框 IoU 中位 0.905**，
+   **文字逐字一致率 63.8%**——离 ≥99% 还很远。
+2. 这个差距的**根因已经定位，不是"没对齐某个参数"**：
+   - 检测器 ONNX 的分割图与 torch 参考**逐值相同**（max|Δ| = 0.0）；
+   - 同一份 PIL 解码下，本文的 letterbox 复刻出来的概率图与参考也几乎一致
+     （max|Δ| = 0.053、>0.3 像素 15790 vs 15791）；
+   - 但**引擎自己解码** JPEG（`image` crate）与 PIL（libjpeg-turbo）差 ±1 LSB，
+     概率图 max|Δ| 就到 0.748、二值域差 1%，DB 域边界移 1–3 px（原图 2–6 px）。
+   - 倾斜行的外接框跟着变，而 manga-ocr 在**贴边的难裁切**上对 1–6 px 极敏感
+     （022 页：参考框 `(1082,214,1218,284)` → `いやっ！！`，我们的框 `(1081,216,1224,285)`
+     → `いやいや`；把参考框喂给引擎则逐字一致）。
+   - 要逐像素对齐，得换成 libjpeg-turbo 兼容的解码器（C 依赖，Windows 交叉构建变复杂）。
+     这是**需要拍板**的事，不是继续调参能解决的。
+3. Windows 归档：需要一份 Windows 的 `onnxruntime.dll` 与 x64 二进制（本机 macOS 交叉不了），
+   所以 `--target all` 现在只能在本机生产 darwin 那一份。
+4. 传 release → 清单里的 sha256 从空变成真值（现在 sha 为空 = 未发布，安装会被明确拒绝）。
+5. **性能**：新束搜索（一直跑自然 `[SEP]`）比旧的早停版慢约 3×，
+   171 页实测约 4.4 s/页（中位 4.25 s）。可以在后续版本里做 KV cache 或早停优化。
 
 ---
 
