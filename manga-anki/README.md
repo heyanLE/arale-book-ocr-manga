@@ -1,6 +1,6 @@
 # manga-anki（引擎）
 
-**あられブック（ARaLeBook）的 manga-anki OCR 引擎**，是 [`arale-book-ocr`](../../README.md) 引擎库里的
+**あられブック（ARaLeBook）的 manga-anki OCR 引擎**，是 [`arale-book-ocr`](../README.md) 引擎库里的
 一个引擎（目前唯一一个）。它和主应用的发版节奏、平台、体积都不是一回事，所以不跟主应用一起发版。
 
 它把 `comic-text-detector`（检测）+ `manga-ocr`（识别）这套 Python 管线重新组装成两个
@@ -8,7 +8,7 @@
 **不需要装 Python、不需要联网**。
 
 ```
-engines/manga-anki/
+manga-anki/                ← 引擎目录（库里的一级目录 = 一个引擎）
 ├── ocr-bridge.py      NDJSON 桥：应用 spawn 它，它把页图变成一行行文字与框（唯一真相源）
 ├── build.mjs          打包脚本：装配 python/ + engine/ + .models/，写 extension.json，打 zip
 ├── launcher/ocr-run   macOS 下的手工启动器（排障用，不是正式 runner）
@@ -62,7 +62,7 @@ engines/manga-anki/
 前置：Node ≥ 20，加上一份 **manga_anki 检出**（提供 `.ocr-venv` 与 `.models`）：
 
 > 模型现在是从那份检出里**拷**的，脚本只查存在性、**不校验 sha256**。
-> 来龙去脉与几种可选形态（自建源 / 按需下载 / 构建时下载）见 [`docs/models.md`](../../docs/models.md)。
+> 来龙去脉与几种可选形态（自建源 / 按需下载 / 构建时下载）见 [`docs/models.md`](../docs/models.md)。
 
 ```bash
 git clone --recursive <arale-book>     # 引擎在 submodule 里

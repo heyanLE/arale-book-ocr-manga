@@ -13,7 +13,7 @@
 
 | 引擎 | 目录 | 语言/运行时 | 归档大小 | 平台 | 状态 |
 |---|---|---|---|---|---|
-| **manga-anki** | [`engines/manga-anki/`](engines/manga-anki/) | Python 3.12（自带解释器）+ comic-text-detector / manga-ocr | **741 MiB**（macOS）/ **745 MiB**（Windows） | macOS arm64、Windows x64 | macOS 已实机跑通整本 171 页；Windows 已打包并做过依赖体检，**未在 Windows 实机运行** |
+| **manga-anki** | [`manga-anki/`](manga-anki/) | Python 3.12（自带解释器）+ comic-text-detector / manga-ocr | **741 MiB**（macOS）/ **745 MiB**（Windows） | macOS arm64、Windows x64 | macOS 已实机跑通整本 171 页；Windows 已打包并做过依赖体检，**未在 Windows 实机运行** |
 
 > 目前只有这一个。清单是**给未来留的位**：第二个引擎（比如 Rust/ONNX 版、或别的语言的实现）
 > 只要满足下面的约定，就能和它并存，应用侧一行代码都不用改。
@@ -58,13 +58,20 @@
 > 所以 macOS 上 `program` 要指向**解释器/可执行文件本身**，不要指向一个还要 `exec` 别人的脚本
 > （manga-anki 就是这么踩过：见它的 README）。
 
-### 3. 目录形状
+### 3. 目录约定
+
+**库根下的一级目录 = 一个引擎**（共享的东西只有 `tools/`、`docs/`、`LICENSE`、`README.md`）。
+这样应用把这个库挂成 submodule 之后，路径正好是 `engines/<引擎名>/`——不用多一层 `engines/engines/`。
 
 ```
-engines/<引擎名>/
-├── README.md          这个引擎是什么、怎么构建、体积、已知限制
-├── build.mjs          构建脚本（把运行时+模型装配成归档，写 extension.json，打 zip）
-└── …                  引擎自己的源码（桥/二进制/模型清单…）
+<库根>/
+├── README.md          引擎清单 + 「一个引擎必须满足什么」（本文件）
+├── <引擎名>/          一个引擎的全部：README + 构建脚本 + 源码
+│   ├── README.md      这个引擎是什么、怎么构建、体积、已知限制
+│   ├── build.mjs      构建脚本（装配运行时+模型，写 extension.json，打 zip）
+│   └── …              桥 / 二进制 / 模型清单…
+├── tools/             跨引擎复用的工具（如 Windows 依赖体检）
+└── docs/              跨引擎的文档（如模型获取）
 ```
 
 构建产物落在本引擎目录下的 `build/` 与 `dist/`（`.gitignore` 已排除）；

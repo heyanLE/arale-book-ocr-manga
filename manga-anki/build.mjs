@@ -91,7 +91,7 @@ import zlib from 'node:zlib';
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const REPO = HERE; // 引擎自己的目录：桥、启动器模板都在这儿（dist/ 也落这儿）
 /** 仓库根：共享工具（跨引擎复用的）放在 `<root>/tools/`。 */
-const LIB_ROOT = path.resolve(HERE, '..', '..');
+const LIB_ROOT = path.resolve(HERE, '..'); // 引擎目录直接在库根下（见库 README 的「目录约定」）
 
 /**
  * 构建前置：一份 **manga_anki 检出**（它提供 `.ocr-venv` 与 `.models`）。
