@@ -21,7 +21,9 @@ pub struct Tokenizer {
     vocab: HashMap<String, i32>,
     pub cls: i32,
     pub sep: i32,
-    pub unk: i32,
+    /// `[PAD]` 的 id：束搜索里"还没写到的位置"要填它。
+    pub pad: i32,
+    unk: i32,
 }
 
 impl Tokenizer {
@@ -41,8 +43,8 @@ impl Tokenizer {
                 .copied()
                 .ok_or_else(|| anyhow::anyhow!("词表里缺少 {name}"))
         };
-        let (cls, sep, unk) = (get("[CLS]")?, get("[SEP]")?, get("[UNK]")?);
-        Ok(Self { vocab, cls, sep, unk })
+        let (cls, sep, unk, pad) = (get("[CLS]")?, get("[SEP]")?, get("[UNK]")?, get("[PAD]")?);
+        Ok(Self { vocab, cls, sep, pad, unk })
     }
 
     /// 文本 → id 序列（含 `[CLS]` / `[SEP]`）。
