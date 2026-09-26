@@ -1,0 +1,41 @@
+{
+  "archivedAt": "2026-09-26",
+  "files": [
+    {
+      "originalPath": "docs/models.md",
+      "archivePath": "docs/models.md",
+      "mode": "moved",
+      "sha256": "e2c910545a6a05f2e57550e05594321f31bc81607b855c87beec07d725305cba",
+      "bytes": 5790
+    },
+    {
+      "originalPath": "docs/roadmap.md",
+      "archivePath": "docs/roadmap.md",
+      "mode": "moved",
+      "sha256": "2ad9f2a6aebe1fb9cba6fcc1969bd8bf8e33114792bf85608d0905c8fbf01da6",
+      "bytes": 8206
+    },
+    {
+      "originalPath": "README.md",
+      "archivePath": "root-README.md",
+      "mode": "snapshot",
+      "sha256": "16d319c684fffec6bf6094e02ae8408b32fe0c300691524ff83265c7b3531433",
+      "bytes": 1935
+    },
+    {
+      "originalPath": "arale_onnx_v1/README.md",
+      "archivePath": "arale_onnx_v1/README.md",
+      "mode": "snapshot",
+      "sha256": "eb7873e104f1f1fdaf379550bb97f964e8d59dd4d4f23b0483ef2c7156b704c7",
+      "bytes": 4932
+    },
+    {
+      "originalPath": "arale_onnx_v1/THIRD_PARTY.md",
+      "archivePath": "arale_onnx_v1/THIRD_PARTY.md",
+      "mode": "snapshot",
+      "sha256": "3495dd05865ab6ae7705d0ccf9cc74dbf1859c542f4d37e4545bfd0ed82eaf5c",
+      "bytes": 919
+    }
+  ],
+  "sourceCommit": "59eed53a07a9361029ca9b0a8384a866c9d01ec3"
+}
