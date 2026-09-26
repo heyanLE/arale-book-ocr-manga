@@ -7,19 +7,19 @@
   "provides": "arale_onnx_v1",
   "minMacOS": 14,
   "platforms": [
-    "darwin"
+    "win32"
   ],
   "arch": [
-    "arm64"
+    "x64"
   ],
   "urls": [
-    "https://github.com/heyanLE/arale-book-ocr-manga/releases/download/v0.2.0/arale_onnx_v1-macos-arm64.zip"
+    "https://github.com/heyanLE/arale-book-ocr-manga/releases/download/v0.2.0/arale_onnx_v1-windows-x64.zip"
   ],
-  "bytes": 722309909,
-  "sha256": "9d83ceca86f6c5e29f635eba2b0b9ab03d06d5c9ff7bc9d09b7f0eb9de244539",
-  "installedBytes": 1060120882,
+  "bytes": 724064723,
+  "sha256": "df1371702cf27cb457d613e6edc5e992511f766198deb11ffb26418e58bd7107",
+  "installedBytes": 1041110688,
   "license": "GPL-3.0",
   "homepage": "https://github.com/heyanLE/arale-book-ocr-manga",
   "requires": [],
-  "notes": "离线可用，不需要用户装 Python 或 ONNX Runtime。解包约 1011 MiB"
+  "notes": "离线可用，不需要用户装 Python 或 ONNX Runtime。解包约 993 MiB"
 }

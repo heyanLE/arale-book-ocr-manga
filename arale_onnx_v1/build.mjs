@@ -1,40 +1,34 @@
 #!/usr/bin/env node
 /**
- * build.mjs —— 把 Rust/ONNX 引擎打成**可下载的扩展归档**。
+ * build.mjs —— 把包内 Python + ONNX Runtime 引擎打成可下载的扩展归档。
  *
- *     node build.mjs --target darwin-arm64 --models /path/to/models --ort /path/to/libonnxruntime.dylib
- *     node build.mjs --target win32-x64 --bin dist/arale_onnx_v1.exe --models … --ort …/onnxruntime.dll
- *     node build.mjs --target all --skip-build
+ *     node build.mjs --target darwin-arm64
+ *     node build.mjs --target win32-x64
  *
  * 产物：
  *
  *     dist/arale_onnx_v1-macos-arm64.zip
  *     dist/arale_onnx_v1-windows-x64.zip
  *     dist/catalog-entry-<target>.json      # 单个平台条目（含 sha256/bytes）
- *     ../catalog.json                       # 引擎库根的清单：一个能力一条，平台差异在 assets 里
+ *     ../repositories/default.jsonl         # 仓库：一行一个引擎，平台差异在 assets 里
  *
  * 归档根的布局（应用解到 `<userData>/extensions/ocr-arale_onnx_v1/` 后直接跑）：
  *
  *     extension.json                 # 自描述 + runner
- *     bin/arale_onnx_v1[.exe]        # 唯一的可执行文件（应用只给这一个 chmod）
- *     models/{detector,manga-ocr-encoder,manga-ocr-decoder}.onnx + vocab.txt
- *     lib/libonnxruntime.<ver>.dylib | onnxruntime.dll
+ *     python/bin/python3 | python/python.exe  # 自带解释器（应用只给它 chmod）
+ *     ocr/ocr_run.py                # ONNX 推理 + Mokuro 几何适配器
+ *     engine/                       # Python 依赖，无 PyTorch
+ *     models/{detector,manga-ocr-encoder,manga-ocr-decoder-init,manga-ocr-decoder-step}.onnx + vocab.txt
  *     LICENSE
  *
- * ## 为什么 ORT 是运行时加载的
- *
- * 引擎用 `ort` 的 **load-dynamic** 编译：构建时**不下载**运行时（构建可离线），
- * 运行时由归档自带的 `lib/` 提供。`extension.json → runner.env.ORT_DYLIB_PATH`
- * 写**相对路径**——应用 spawn 时 `cwd` = 安装目录（`src/main/ocr/providers/extension.ts`），
- * 所以相对路径可解析，也不怕用户搬目录。
+ * ONNX Runtime 的 Python wheel 已包含在 engine/ 内；构建时不联网。
  *
  * ## 为什么只有一个可执行文件
  *
  * 应用解压走 `native/arale-native` 的 zip 解包，**不还原 unix 权限位**；唯一补权限的
  * 地方是 `src/main/extensions/service.ts` 的 `chmodExecutable()`，而它只给
- * `extension.json → runner.program` 那一个路径 chmod 0755。所以 runner 必须是**那一个**
- * 原生二进制，不能是 shell 脚本去 exec 别的东西。（上一版 Python 引擎因此把 runner
- * 指成 `python/bin/python3`；Rust 版没这个问题。）
+ * `extension.json → runner.program` 那一个路径 chmod 0755。所以 runner 直接指向
+ * `python/bin/python3`，不能指向需要再启动其它未补权限文件的 shell 脚本。
  *
  * ## zip 是自己写的
  *
@@ -47,8 +41,7 @@ import fsp from 'node:fs/promises';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import zlib from 'node:zlib';
-import { spawnSync } from 'node:child_process';
-import { Readable, Transform, Writable, pipeline } from 'node:stream';
+import { Transform, Writable, pipeline } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
@@ -60,36 +53,45 @@ const ENGINE_ID = 'arale_onnx_v1';
 const EXTENSION_ID = `ocr-${ENGINE_ID}`;
 const ENGINE_NAME = 'arale_onnx_v1（ONNX 版 OCR）';
 const ENGINE_SUMMARY =
-  'comic-text-detector 检测 + manga-ocr 识别，Rust 实现 + 自带 ONNX Runtime。竖排质量好，装完不需要任何外部依赖。';
+  'Mokuro 几何流程 + ONNX Runtime 推理，自带 Python 解释器、依赖和模型，不需要用户安装 Python 或 PyTorch。';
 const REPO = 'heyanLE/arale-book-ocr-manga';
 const LICENSE = 'GPL-3.0';
+const ENGINE_VERSION = '0.2.0';
 const HOMEPAGE = `https://github.com/${REPO}`;
 
-/** 三个模型 + 词表：模型文件太大，不进 git，构建时从本机检出拷。 */
+/** 检测器、编码器、缓存解码器首步/续步图 + 词表；旧无缓存图仅用于开发对照。 */
 const MODEL_FILES = [
   'detector.onnx',
   'manga-ocr-encoder.onnx',
-  'manga-ocr-decoder.onnx',
+  'manga-ocr-decoder-init.onnx',
+  'manga-ocr-decoder-step.onnx',
   'vocab.txt',
 ];
+const MODEL_HASHES = JSON.parse(fs.readFileSync(path.join(here, 'model-manifest.json'), 'utf8')).files;
+
+async function sha256File(file) {
+  const hash = crypto.createHash('sha256');
+  for await (const chunk of fs.createReadStream(file)) hash.update(chunk);
+  return hash.digest('hex');
+}
 
 const TARGETS = {
-  'darwin-arm64': { platform: 'darwin', arch: 'arm64', asset: 'arale_onnx_v1-macos-arm64.zip', exe: ENGINE_ID, ort: 'libonnxruntime.1.30.0.dylib' },
-  'darwin-x64': { platform: 'darwin', arch: 'x64', asset: 'arale_onnx_v1-macos-x64.zip', exe: ENGINE_ID, ort: 'libonnxruntime.1.30.0.dylib' },
-  'win32-x64': { platform: 'win32', arch: 'x64', asset: 'arale_onnx_v1-windows-x64.zip', exe: `${ENGINE_ID}.exe`, ort: 'onnxruntime.dll' },
+  'darwin-arm64': { platform: 'darwin', arch: 'arm64', asset: 'arale_onnx_v1-macos-arm64.zip', python: 'python/bin/python3' },
+  'darwin-x64': { platform: 'darwin', arch: 'x64', asset: 'arale_onnx_v1-macos-x64.zip', python: 'python/bin/python3' },
+  'win32-x64': { platform: 'win32', arch: 'x64', asset: 'arale_onnx_v1-windows-x64.zip', python: 'python/python.exe' },
 };
 
 function parseArgs(argv) {
   const args = {
     target: null,
-    models: null,
-    ort: null,
-    bin: null,
+    models: path.join(here, 'models'),
+    runtime: null,
     version: null,
     out: path.join(here, 'dist'),
     level: 6,
-    skipBuild: false,
     keepStaging: false,
+    debug: false,
+    indexCrossBuild: false,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const flag = argv[i];
@@ -100,13 +102,13 @@ function parseArgs(argv) {
     };
     if (flag === '--target') args.target = next();
     else if (flag === '--models') args.models = next();
-    else if (flag === '--ort') args.ort = next();
-    else if (flag === '--bin') args.bin = next();
+    else if (flag === '--runtime') args.runtime = next();
     else if (flag === '--version') args.version = next();
     else if (flag === '--out') args.out = path.resolve(next());
     else if (flag === '--level') args.level = Number(next());
-    else if (flag === '--skip-build') args.skipBuild = true;
     else if (flag === '--keep-staging') args.keepStaging = true;
+    else if (flag === '--debug') args.debug = true;
+    else if (flag === '--index-cross-build') args.indexCrossBuild = true;
     else if (flag === '--help' || flag === '-h') args.help = true;
     else throw new Error(`未知参数：${flag}`);
   }
@@ -117,29 +119,14 @@ const USAGE = `用法：
   node build.mjs --target <darwin-arm64|darwin-x64|win32-x64|all> [选项]
 
 选项：
-  --models <dir>    含 detector.onnx / manga-ocr-*.onnx / vocab.txt 的目录
-  --ort <file>      ONNX Runtime 共享库（darwin: libonnxruntime.*.dylib，win32: onnxruntime.dll）
-  --bin <file>      预编译好的引擎可执行文件（跳过 cargo；交叉构建时用）
-  --version <v>     扩展版本（缺省读 Cargo.toml 的 version）
+  --models <dir>    模型目录（缺省 <引擎目录>/models，被 gitignore 排除）
+  --runtime <dir>  包内 Python + 依赖目录（缺省 runtime/<target>/，被 gitignore 排除）
+  --version <v>   扩展版本（缺省 ${ENGINE_VERSION}）
   --out <dir>       产物目录（缺省 <引擎目录>/dist）
   --level <0-9>     deflate 级别（缺省 6）
-  --skip-build      不跑 cargo
-  --keep-staging    保留中间目录（排障）`;
-
-function versionFromCargo() {
-  const text = fs.readFileSync(path.join(here, 'Cargo.toml'), 'utf8');
-  const match = /^version\s*=\s*"([^"]+)"/m.exec(text);
-  if (match === null) throw new Error('Cargo.toml 里找不到 version');
-  return match[1];
-}
-
-function cargoBuild() {
-  const cargo = process.env.CARGO ?? 'cargo';
-  console.log(`[build] ${cargo} build --release`);
-  const result = spawnSync(cargo, ['build', '--release'], { cwd: here, stdio: 'inherit' });
-  if (result.status !== 0) throw new Error(`cargo build 失败（退出码 ${result.status}）`);
-  return path.join(here, 'target', 'release', TARGETS['darwin-arm64'].exe);
-}
+  --keep-staging    保留中间目录（排障）
+  --debug           只生成 build/dev-<target>/，供开发版直接加载，不制作发布归档
+  --index-cross-build  允许把非本机平台归档写进 JSONL（仅在目标机器验收后使用）`;
 
 // ---------------------------------------------------------------------------
 // 自描述
@@ -153,14 +140,14 @@ function writeManifest(staging, target, version) {
     version,
     kind: 'ocr-engine',
     provides: ENGINE_ID,
+    minMacOS: 14,
     license: LICENSE,
     homepage: HOMEPAGE,
     description: ENGINE_SUMMARY,
     runner: {
-      program: `bin/${spec.exe}`,
-      args: ['--pages-file', '{pagesFile}'],
-      // 相对安装目录（应用 spawn 时 cwd = 安装目录）
-      env: { ORT_DYLIB_PATH: `lib/${spec.ort}` },
+      program: spec.python,
+      args: ['-s', '-u', 'ocr/ocr_run.py', '--pages-file', '{pagesFile}'],
+      env: { PYTHONPATH: 'engine' },
     },
   };
   fs.writeFileSync(path.join(staging, 'extension.json'), `${JSON.stringify(manifest, null, 2)}\n`);
@@ -298,39 +285,46 @@ function listFiles(dir, prefix = '') {
 
 async function buildTarget(target, args, version) {
   const spec = TARGETS[target];
-  const staged = path.join(here, 'build', `staging-${target}`);
-  await fsp.rm(staged, { recursive: true, force: true });
-  await fsp.mkdir(path.join(staged, 'bin'), { recursive: true });
-  await fsp.mkdir(path.join(staged, 'models'), { recursive: true });
-  await fsp.mkdir(path.join(staged, 'lib'), { recursive: true });
-
-  // ① 可执行文件
-  let bin = args.bin;
-  if (bin === null) {
-    if (args.skipBuild) throw new Error('--skip-build 时必须给 --bin');
-    if (target !== hostTarget()) {
-      throw new Error(`本机是 ${hostTarget()}，不能直接构建 ${target}；请用 --bin 给交叉编译产物`);
-    }
-    bin = cargoBuild();
+  const modelDir = path.resolve(args.models);
+  const runtimeDir = path.resolve(args.runtime ?? path.join(here, 'runtime', target));
+  for (const name of MODEL_FILES) {
+    if (!fs.existsSync(path.join(modelDir, name))) throw new Error(`模型目录里缺 ${name}：${modelDir}`);
+    const actual = await sha256File(path.join(modelDir, name));
+    if (actual !== MODEL_HASHES[name]) throw new Error(`${name} sha256 不匹配 model-manifest.json：${actual}`);
   }
-  await fsp.copyFile(bin, path.join(staged, 'bin', spec.exe));
-  await fsp.chmod(path.join(staged, 'bin', spec.exe), 0o755);
+  if (!fs.existsSync(path.join(runtimeDir, spec.python))) {
+    throw new Error(`缺少目标平台包内 Python：${path.join(runtimeDir, spec.python)}`);
+  }
+  if (!fs.existsSync(path.join(runtimeDir, 'engine', 'onnxruntime'))) {
+    throw new Error(`缺少 ONNX Runtime Python 包：${path.join(runtimeDir, 'engine', 'onnxruntime')}`);
+  }
+  if (fs.existsSync(path.join(runtimeDir, 'engine', 'torch'))) {
+    throw new Error('runtime 中仍含 PyTorch；拒绝打包');
+  }
+  const staged = path.join(here, 'build', `${args.debug ? 'dev' : 'staging'}-${target}`);
+  await fsp.rm(staged, { recursive: true, force: true });
+  await fsp.cp(path.join(runtimeDir, 'python'), path.join(staged, 'python'), { recursive: true });
+  await fsp.cp(path.join(runtimeDir, 'engine'), path.join(staged, 'engine'), { recursive: true });
+  await fsp.cp(path.join(here, 'python'), path.join(staged, 'ocr'), { recursive: true });
+  await fsp.mkdir(path.join(staged, 'models'), { recursive: true });
+  if (target.startsWith('darwin')) await fsp.chmod(path.join(staged, spec.python), 0o755);
 
   // ② 模型（平台无关，两个归档各一份）
-  if (args.models === null) throw new Error('必须给 --models（模型目录）');
   for (const name of MODEL_FILES) {
-    const from = path.join(path.resolve(args.models), name);
-    if (!fs.existsSync(from)) throw new Error(`模型目录里缺 ${name}：${from}`);
+    const from = path.join(modelDir, name);
     await fsp.copyFile(from, path.join(staged, 'models', name));
   }
 
-  // ③ ONNX Runtime
-  if (args.ort === null) throw new Error('必须给 --ort（ONNX Runtime 共享库）');
-  await fsp.copyFile(path.resolve(args.ort), path.join(staged, 'lib', spec.ort));
-
-  // ④ 自描述 + 许可
+  // 自描述 + 许可
   writeManifest(staged, target, version);
   await fsp.copyFile(path.join(root, 'LICENSE'), path.join(staged, 'LICENSE'));
+  await fsp.copyFile(path.join(here, 'THIRD_PARTY.md'), path.join(staged, 'THIRD_PARTY.md'));
+
+  // 开发包保留完整目录，应用直接按 extension.json 加载，不依赖用户安装记录。
+  if (args.debug) {
+    console.log(`[debug] ${staged}`);
+    return null;
+  }
 
   // ⑤ 打包
   await fsp.mkdir(args.out, { recursive: true });
@@ -339,7 +333,7 @@ async function buildTarget(target, args, version) {
   const total = files.reduce((sum, file) => sum + file.bytes, 0);
   console.log(`[zip] ${spec.asset}：${files.length} 个文件，未压缩 ${mb(total)}`);
   const bytes = await writeZip(outFile, files, args.level);
-  const sha256 = crypto.createHash('sha256').update(await fsp.readFile(outFile)).digest('hex');
+  const sha256 = await sha256File(outFile);
 
   const entry = {
     asset: spec.asset,
@@ -354,6 +348,7 @@ async function buildTarget(target, args, version) {
     version,
     kind: 'ocr-engine',
     provides: ENGINE_ID,
+    minMacOS: 14,
     platforms: [spec.platform],
     arch: [spec.arch],
     urls: [`https://github.com/${REPO}/releases/download/v${version}/${spec.asset}`],
@@ -380,29 +375,16 @@ function mb(bytes) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
 }
 
-function hostTarget() {
-  if (process.platform === 'darwin') return process.arch === 'arm64' ? 'darwin-arm64' : 'darwin-x64';
-  if (process.platform === 'win32') return 'win32-x64';
-  return 'linux-x64';
-}
-
-/**
- * 引擎库根的 `catalog.json`：**一个能力一条**，平台差异在 `assets` 里。
- * 重复 id 会让整份清单作废（应用的 `parseCatalog` 拒绝），所以这里是合并而不是追加。
- */
-async function writeCatalog(version, built) {
-  const catalogPath = path.join(root, 'catalog.json');
-  let catalog = { schemaVersion: 1, extensions: [] };
-  if (fs.existsSync(catalogPath)) {
-    try {
-      catalog = JSON.parse(fs.readFileSync(catalogPath, 'utf8'));
-    } catch {
-      console.warn('[warn] 现有 catalog.json 读不动，重建');
-    }
+/** 一个仓库一个 JSONL 文件；只更新本引擎那一行，保留其它引擎。 */
+async function writeRepository(version, built) {
+  const repoPath = path.join(root, 'repositories', 'default.jsonl');
+  let entries = [];
+  if (fs.existsSync(repoPath)) {
+    entries = fs.readFileSync(repoPath, 'utf8').split(/\r?\n/).filter(Boolean).map((line) => JSON.parse(line));
   }
   const assets = {};
   for (const { target, entry } of built) assets[`${TARGETS[target].platform}-${TARGETS[target].arch}`] = entry;
-  const existing = (catalog.extensions ?? []).find((item) => item.id === EXTENSION_ID);
+  const existing = entries.find((item) => item.id === EXTENSION_ID);
   const merged = {
     id: EXTENSION_ID,
     name: ENGINE_NAME,
@@ -410,15 +392,20 @@ async function writeCatalog(version, built) {
     version,
     kind: 'ocr-engine',
     provides: ENGINE_ID,
-    release: { repo: REPO, tag: `v${version}`, assets: { ...(existing?.release?.assets ?? {}), ...assets } },
+    minMacOS: 14,
+    release: { repo: REPO, tag: `v${version}`, assets: { ...(existing?.version === version ? existing.release?.assets ?? {} : {}), ...assets } },
     license: LICENSE,
     homepage: HOMEPAGE,
     requires: [],
   };
-  const others = (catalog.extensions ?? []).filter((item) => item.id !== EXTENSION_ID);
-  const next = { schemaVersion: 1, generatedAt: new Date().toISOString(), extensions: [...others, merged] };
-  await fsp.writeFile(catalogPath, `${JSON.stringify(next, null, 2)}\n`);
-  console.log(`[ok ] ${catalogPath}`);
+  entries = [...entries.filter((item) => item.id !== EXTENSION_ID), merged];
+  await fsp.mkdir(path.dirname(repoPath), { recursive: true });
+  await fsp.writeFile(repoPath, `${entries.map((item) => JSON.stringify(item)).join('\n')}\n`);
+  console.log(`[ok ] ${repoPath}`);
+}
+
+function hostTarget() {
+  return `${process.platform}-${process.arch}`;
 }
 
 async function main() {
@@ -429,14 +416,23 @@ async function main() {
     process.exitCode = 2;
     return;
   }
-  const version = args.version ?? versionFromCargo();
+  const version = args.version ?? ENGINE_VERSION;
   const targets = args.target === 'all' ? ['darwin-arm64', 'win32-x64'] : args.target.split(',');
   for (const target of targets) {
     if (TARGETS[target] === undefined) throw new Error(`未知 --target：${target}`);
   }
   const built = [];
   for (const target of targets) built.push({ target, entry: await buildTarget(target, args, version) });
-  if (targets.length > 0) await writeCatalog(version, built);
+  const indexed = built.map(({ target, entry }) => ({
+    target,
+    entry: args.indexCrossBuild || target === hostTarget() ? entry : { ...entry, sha256: '' },
+  }));
+  if (!args.debug && indexed.length > 0) await writeRepository(version, indexed);
+  for (const { target } of built) {
+    if (!args.debug && target !== hostTarget() && !args.indexCrossBuild) {
+      console.log(`[warn] ${target} 是交叉打包，JSONL 中 sha256 留空，安装被拒绝；在目标平台验收后使用 --index-cross-build`);
+    }
+  }
 }
 
 main().catch((error) => {

@@ -1,11 +1,14 @@
-# 构建产物：1.6 GB 级中间产物与 0.7 GB 级归档。**不进 git**：
+# 构建产物：模型、包内 Python 和归档都不进 git。
 # 归档走 GitHub Release（Release 资源不计 LFS 配额，也不需要 git clone 拉下来）。
 # 注意是 `**/`：引擎在 engines/<id>/ 下面，各引擎各有自己的 build/ 与 dist/。
 **/build/
 **/dist/*.zip
-# 清单条目是构建产物（含 sha256/bytes），很小且发布时要粘进应用的 catalog.json，
-# 所以允许进仓库——但要记得它是**上一次构建**的结果。
+**/target/
+**/__pycache__/
+**/*.pyc
+# 单平台构建记录和 repositories/default.jsonl 很小，允许提交。
 !**/dist/catalog-entry-*.json
 
-# Rust 构建目录（每平台各一份，GB 级）
-**/target/
+# 模型权重只在构建机上保存；归档上传 Release，不能提交模型或本地开发包。
+arale_onnx_v1/models/
+arale_onnx_v1/runtime/

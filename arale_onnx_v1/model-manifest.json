@@ -1,0 +1,14 @@
+{
+  "format": "onnx-fp32-opset17-with-kv-cache",
+  "source": {
+    "recognizer": "kha-white/manga-ocr-base",
+    "detector": "zyddnys/manga-image-translator beta-0.2.1 comictextdetector.pt"
+  },
+  "files": {
+    "detector.onnx": "45d7b32821bde9053df4f4b4d3b4f41aeb082793c0808553afd12d03ef644cfb",
+    "manga-ocr-encoder.onnx": "9bff44c9622e50955c66701e409e3317b300729e5c98069b9be673f12130d104",
+    "manga-ocr-decoder-init.onnx": "81646fd9da08892570342bd6aa6b72584d31f841efe0390013ea16ef9c86ae20",
+    "manga-ocr-decoder-step.onnx": "7705362896a85ee737c3b5cd1325fe657d0b772b8f084a59156fd980a896b709",
+    "vocab.txt": "344fbb6b8bf18c57839e924e2c9365434697e0227fac00b88bb4899b78aa594d"
+  }
+}
