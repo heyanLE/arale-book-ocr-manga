@@ -28,7 +28,7 @@
 
 ## 3. 应用契约
 
-归档根的 `extension.json` 声明 runner：macOS 为 `python/bin/python3`，Windows 为 `python/python.exe`。参数运行 `ocr/ocr_run.py --pages-file <json>`，`PYTHONPATH=engine`；Windows 的 `_pth` 搜索路径仍有待修事项。
+归档根的 `extension.json` 声明 runner：macOS 为 `python/bin/python3`，Windows 为 `python/python.exe`。参数运行 `ocr/ocr_run.py --pages-file <json>`，`PYTHONPATH=engine`；Windows 的 `_pth` 已由 `prepare-runtime.mjs` 补入 `..\ocr`。
 
 页清单接受 `{ "pages": [{ "rel": "001.jpg", "absPath": "...", "width": 100, "height": 200 }] }` 或裸数组。
 stdout 是 NDJSON：`meta`、逐页 `page`、自检 `probe`、整体错误 `fatal`；诊断写 stderr。
@@ -86,7 +86,9 @@ Windows runtime 准备可加 `--opencv-packages /path/to/unpacked-headless-wheel
 | Mokuro 一致率 | 参考 387 行、本引擎 388 行；配对 387 行中 380 行文字一致（98.2%），差异集中 001/169 页；不是人工准确率 |
 | macOS 运行 | 包内解释器、开发目录、解压的 ZIP、应用扩展 provider 单页 OCR 已通过 |
 | ZIP | 两平台完整性和 SHA 检查通过；Mac 与 Windows 归档均已生成 |
-| Windows | 186 个 PE 静态扫描无硬缺失，仍有 `msvcp140.dll` 条件项；未运行 |
+| Windows | Windows 11 build 26200 上修复 `_pth` 后，debug 构建、包内 `--probe` 和 30 页 OCR 均通过；默认 4 线程耗时 118.948 秒，30/30 页、388 行 |
+
+Windows 首轮使用嵌入式 Python 3.12.10、ONNX Runtime 1.30.0、OpenCV 5.0.0、NumPy 2.5.3。与迁移包中的 Mac 缓存版预期输出按同页同行比较，文字 379/388、框 343/388、方向 387/388 精确一致，8/30 页完全一致。该数据是平台独立验收记录，不取代 Mac 8 线程性能数据；识别与框差异仍需评估。应用 provider/队列与 GUI 真 OCR 已通过，干净 Windows 的 VC++ 条件依赖仍未验证。
 
 性能与质量测试使用私有测试漫画，图像没有提交到 Git；原始日志曾位于构建机 `/tmp`，不能假定在新设备存在。复测应使用自行迁移的同一套页图并记录样本清单，不能把别的书的时间直接并表。
 
@@ -105,6 +107,6 @@ Windows ZIP 真实 SHA-256：`df1371702cf27cb457d613e6edc5e992511f766198deb11ffb
 
 ## 8. 下一步
 
-Windows 优先：检查 `python312._pth` 是否包含 `..\ocr` → 包内 `--probe` → 单页 OCR → 干净系统的 VC++ DLL → 应用 provider/队列/安装包。headless OpenCV 已去除静态 Media Foundation 依赖，仍需实机确认。
+Windows 优先：`python312._pth`、包内 `--probe`、30 页进程 OCR、应用 provider/队列和 GUI 真 OCR 已完成；接着评估跨平台输出差异 → 干净系统的 VC++ DLL → 实际安装/卸载 NSIS。headless OpenCV 已去除静态 Media Foundation 依赖，仍需在干净环境确认。
 模型侧后续可以考虑合并两张解码图的重复权重、全量页验收、CoreML/量化实验；这些尚未完成，也不是迁移时默认要改的方向。
 旧路线资料都在[归档](archive/2026-09-26/README.md)，不得把旧 Rust 的速度、旧 int8 体积目标或旧 PyTorch 安装方法当成当前方案。

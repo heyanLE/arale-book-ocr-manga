@@ -29,6 +29,24 @@ for (const [label, directory] of [['Python', pythonDir], ['依赖', sitePackages
 fs.rmSync(output, { recursive: true, force: true });
 fs.mkdirSync(output, { recursive: true });
 fs.cpSync(pythonDir, path.join(output, 'python'), { recursive: true });
+if (name === 'win32-x64') {
+  const pythonOutput = path.join(output, 'python');
+  const pthFiles = fs.readdirSync(pythonOutput).filter((entry) => /^python\d+\._pth$/i.test(entry));
+  if (pthFiles.length !== 1) {
+    throw new Error(`Windows 嵌入式 Python 应有且仅有一个 _pth 文件，实际找到 ${pthFiles.length} 个`);
+  }
+  const pthFile = path.join(pythonOutput, pthFiles[0]);
+  const lines = fs.readFileSync(pthFile, 'utf8').split(/\r?\n/);
+  if (!lines.some((line) => line.trim() === '..\\ocr')) {
+    let insertAt = lines.findIndex((line) => line.trim() === 'import site');
+    if (insertAt < 0) {
+      insertAt = lines.length;
+      while (insertAt > 0 && lines[insertAt - 1] === '') insertAt -= 1;
+    }
+    lines.splice(insertAt, 0, '..\\ocr');
+    fs.writeFileSync(pthFile, lines.join('\r\n'));
+  }
+}
 fs.mkdirSync(path.join(output, 'engine'), { recursive: true });
 for (const entry of fs.readdirSync(sitePackages, { withFileTypes: true })) {
   if (skip.test(entry.name)) continue;
