@@ -1,6 +1,6 @@
 # 当前 OCR 引擎：Python + ONNX Runtime + KV cache
 
-核对日期：2026-09-26。引擎功能基线 `59eed53`；实现版本 `0.2.0`。后续文档提交不会改变这个功能基线。
+核对日期：2026-09-30。引擎功能基线 `59eed53`；实现版本 `0.2.0`。后续文档提交不会改变这个功能基线。
 
 ## 1. 已确定的实现
 
@@ -103,7 +103,8 @@ Windows 首轮使用嵌入式 Python 3.12.10、ONNX Runtime 1.30.0、OpenCV 5.0.
 
 macOS ZIP SHA-256：`9d83ceca86f6c5e29f635eba2b0b9ab03d06d5c9ff7bc9d09b7f0eb9de244539`。
 Windows ZIP 真实 SHA-256：`df1371702cf27cb457d613e6edc5e992511f766198deb11ffb26418e58bd7107`。它只在单平台构建记录中保留，不应误填成“已验证可安装”。
-两个 ZIP 在本轮未上传 Release；JSONL 中的 Release URL 是计划地址，不是上传成功的证据。
+2026-09-30：macOS ZIP 已上传到 [v0.2.0 草稿 Release](https://github.com/heyanLE/arale-book-ocr-manga/releases/tag/untagged-f9d76c87bef99f6d63e5)，GitHub 页面显示 Draft、Assets 1、`arale_onnx_v1-macos-arm64.zip`（688.85 MB）。本地 `shasum -a 256` 与上表 SHA 一致，`unzip -tqq` 通过。草稿尚未公开，正式 tag 尚未创建，应用内计划下载 URL 仍不可用。
+Windows ZIP 尚未上传；JSONL 的 Windows SHA 保持空值，应用继续拒绝安装。待 Windows 设备完成干净环境验收后，再将经验证的 Windows 资产加入同一 Release，并更新 JSONL；不能把交叉构建记录的 SHA 直接视作发布许可。
 
 ## 8. 下一步
 
