@@ -1,6 +1,6 @@
 # 当前 OCR 引擎：Python + ONNX Runtime + KV cache
 
-核对日期：2026-09-30。引擎功能基线 `59eed53`；实现版本 `0.2.0`。后续文档提交不会改变这个功能基线。
+核对日期：2026-10-02。引擎功能基线 `59eed53`；实现版本 `0.2.0`。后续文档提交不会改变这个功能基线。本轮同步各 README 的 Windows 状态，未重新执行引擎测试；运行证据仍以以下按日期记录为准。
 
 ## 1. 已确定的实现
 
@@ -99,12 +99,13 @@ Windows 首轮使用嵌入式 Python 3.12.10、ONNX Runtime 1.30.0、OpenCV 5.0.
 | 平台 | ZIP 字节数 | 约 MiB | 验证/安装 |
 |---|---:|---:|---|
 | macOS arm64 | 722309909 | 688.8 | 包内 OCR 已测；最低 macOS 14；索引有 SHA |
-| Windows x64 | 724064723 | 690.5 | 交叉打包；索引 SHA 空，当前拒绝安装 |
+| Windows x64 | 724856114 | 691.3 | 已公开；正式网络下载、应用安装和下载后单页 OCR 通过；本地索引 SHA 已填，待推送 |
 
 macOS ZIP SHA-256：`9d83ceca86f6c5e29f635eba2b0b9ab03d06d5c9ff7bc9d09b7f0eb9de244539`。
-Windows ZIP 真实 SHA-256：`df1371702cf27cb457d613e6edc5e992511f766198deb11ffb26418e58bd7107`。它只在单平台构建记录中保留，不应误填成“已验证可安装”。
+Windows ZIP 真实 SHA-256：`568783245c842a0726b7bafddb723ad8722873bf186a9f6fe67fabbd9a5c3027`。已匹配公开 Release 的 GitHub digest 和应用实际下载 SHA；本地 JSONL 已填写，远端索引需推送后生效。
 2026-09-30：macOS ZIP 已上传到 [v0.2.0 草稿 Release](https://github.com/heyanLE/arale-book-ocr-manga/releases/tag/untagged-f9d76c87bef99f6d63e5)，GitHub 页面显示 Draft、Assets 1、`arale_onnx_v1-macos-arm64.zip`（688.85 MB）。本地 `shasum -a 256` 与上表 SHA 一致，`unzip -tqq` 通过。草稿尚未公开，正式 tag 尚未创建，应用内计划下载 URL 仍不可用。
-Windows ZIP 尚未上传；JSONL 的 Windows SHA 保持空值，应用继续拒绝安装。待 Windows 设备完成干净环境验收后，再将经验证的 Windows 资产加入同一 Release，并更新 JSONL；不能把交叉构建记录的 SHA 直接视作发布许可。
+2026-10-01：在 Windows x64 目标机从当前 runtime 与锁定模型重新构建 `arale_onnx_v1-windows-x64.zip`。最终归档共 4,632 个文件，解包 1,043,229,186 字节；解压后的包内 `python312._pth` 含 `..\ocr`，`python/python.exe -s -u ocr/ocr_run.py --probe` 返回 `ok: true`，五个模型文件 SHA 全部匹配清单，对 `samples/ocr-fixture.png` 真识别成功（800×1200、7 行），PE 扫描 186 个文件无硬缺失，仍提示 `msvcp140.dll` 条件依赖。命令为 `node arale_onnx_v1/build.mjs --target win32-x64` 和 `node tools/audit-win-deps.mjs <解压目录>`。
+2026-10-01 发布后补记：用户已公开 [v0.2.0 Release](https://github.com/heyanLE/arale-book-ocr-manga/releases/tag/v0.2.0)，API 确认两个资产大小/digest 均匹配构建记录。Windows 11 通过父仓库 `scripts/verify-ocr-download.cjs` 在隔离目录使用真实 ExtensionService 从 GitHub 下载、校验、解压、安装，并由 ExtensionOcrEngine 真识别夹具 7 行；验收代理为 `http://127.0.0.1:8400`，未使用开发目录。JSONL 的 Windows SHA 已在本地补入，尚未提交推送。干净 Windows 的 VC++ 条件依赖、macOS 正式网络安装、NSIS 安装/卸载及更多真实书籍仍未验证。
 
 ## 8. 下一步
 

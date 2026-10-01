@@ -15,11 +15,11 @@
   "urls": [
     "https://github.com/heyanLE/arale-book-ocr-manga/releases/download/v0.2.0/arale_onnx_v1-windows-x64.zip"
   ],
-  "bytes": 724064723,
-  "sha256": "df1371702cf27cb457d613e6edc5e992511f766198deb11ffb26418e58bd7107",
-  "installedBytes": 1041110688,
+  "bytes": 724856114,
+  "sha256": "568783245c842a0726b7bafddb723ad8722873bf186a9f6fe67fabbd9a5c3027",
+  "installedBytes": 1043229186,
   "license": "GPL-3.0",
   "homepage": "https://github.com/heyanLE/arale-book-ocr-manga",
   "requires": [],
-  "notes": "离线可用，不需要用户装 Python 或 ONNX Runtime。解包约 993 MiB"
+  "notes": "离线可用，不需要用户装 Python 或 ONNX Runtime。解包约 995 MiB"
 }
